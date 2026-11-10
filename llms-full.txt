@@ -279,6 +279,13 @@ listed verbatim so an agent can jump straight to the right document.
   - Error handling
   - Evidence for review
 
+## docs/dry-run-command-inventory.md
+
+- [Mutating command dry-run inventory](https://github.com/ashlrai/locus/blob/main/docs/dry-run-command-inventory.md)
+  - Commands with plans
+  - No Locus preview
+  - Verification
+
 ## docs/dry-run-matrix-q8.md
 
 - [Dry-run command matrix](https://github.com/ashlrai/locus/blob/main/docs/dry-run-matrix-q8.md)
@@ -386,6 +393,13 @@ listed verbatim so an agent can jump straight to the right document.
 - [Hub integration smoke isolation](https://github.com/ashlrai/locus/blob/main/docs/hub-integration-isolation.md)
   - Allocation and use
   - Cleanup and boundaries
+
+## docs/hub-integration-prerequisites.md
+
+- [Hub integration smoke prerequisites](https://github.com/ashlrai/locus/blob/main/docs/hub-integration-prerequisites.md)
+  - Services and tools
+  - Environment
+  - Run and interpret results
 
 ## docs/hub-integration-temp-lifecycle.md
 
@@ -800,6 +814,7 @@ listed verbatim so an agent can jump straight to the right document.
   - Local verification of an unsigned release manifest
     - Tampering example
   - What it is
+    - Canonicalization and signature verification
   - Trust model
   - Commands
     - Operator: optionally sign and distribute a manifest
