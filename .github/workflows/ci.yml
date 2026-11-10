@@ -104,6 +104,7 @@ jobs:
           # Exercise the dependency-free public-site contract in the required gate.
           node --test apps/web
           node --test scripts/install-extract.test.mjs
+          bash scripts/archive-installer-extract.test.sh
           node --test scripts/check-crypto.test.mjs
           node --test scripts/install-checksum.test.mjs
           node --test scripts/install-download.test.mjs
