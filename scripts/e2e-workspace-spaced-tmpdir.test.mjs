@@ -89,11 +89,13 @@ ${body}
   });
 }
 
+const recordMode = 'stat -f %Lp "$WS_DIR" 2>/dev/null > "$MODE_RECORD" || stat -c %a "$WS_DIR" > "$MODE_RECORD"';
+
 test('the allocated workspace is usable and removed on exit beneath a spaced TMPDIR', (t) => {
   const f = fixture(t);
   const result = probe(f, `[[ -d "$WS_DIR" && "\${WS_DIR%/*}" == "$TMPDIR" && \\
   "\${WS_DIR##*/}" == locus-ws.* ]] || exit 71
-{ stat -f %Lp "$WS_DIR" 2>/dev/null || stat -c %a "$WS_DIR"; } > "$MODE_RECORD"
+${recordMode}
 # Usable, not just present: nested spaced paths round-trip, the allowlist
 # lands inside it (as the real probes require), and entering it resolves to
 # one physical path beneath the spaced root.
@@ -118,6 +120,17 @@ printf '%s' "$WS_DIR" > "$OBSERVED"
   assert.deepEqual(readdirSync(f.scratch).sort(), ['keep'], 'the supplied TMPDIR keeps only its own entries');
   assert.equal(readFileSync(join(f.decoy, 'decoy-sentinel'), 'utf8'), 'decoy',
     'cleanup must leave the word-split sibling of the spaced TMPDIR untouched');
+});
+
+test('mode fallback discards stdout from a failed BSD stat probe', (t) => {
+  const f = fixture(t);
+  const result = probe(f, recordMode, { shim: `stat() {
+  if [[ "$1" == -f ]]; then printf 'partial filesystem output\\n'; return 1; fi
+  [[ "$1" == -c && "$2" == %a && -d "$3" ]] || return 1
+  printf '700\\n'
+}` });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(f.mode, 'utf8').trim(), '700');
 });
 
 test('the complete spaced path reaches mktemp as one template argument', (t) => {
@@ -228,8 +241,13 @@ function locusStub(root) {
   const locus = join(bin, 'locus');
   writeFileSync(locus, `#!/bin/sh
 case "$1" in
-  init) printf 'stub init\\n' > "$LOCUS_HOME/init-stamp" && exit 0 ;;
-  workspace) printf '# stub workspace config\\n' > .locus.toml && exit 0 ;;
+  init)
+    test "$LOCUS_HOME" = "$TMPDIR/subshell-home" || exit 1
+    printf 'stub init\\n' > "$LOCUS_HOME/init-stamp" && exit 0 ;;
+  workspace)
+    case "$PWD" in "$TMPDIR"/locus-ws.*) ;; *) exit 1 ;; esac
+    test -f "$LOCUS_HOME/init-stamp" || exit 1
+    printf '# stub workspace config\\n' > .locus.toml && exit 0 ;;
 esac
 exit 1
 `, { mode: 0o755 });
