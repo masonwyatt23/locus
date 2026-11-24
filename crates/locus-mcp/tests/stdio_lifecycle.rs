@@ -99,6 +99,21 @@ impl Client {
             result["isError"].as_bool().unwrap_or(false),
         )
     }
+
+    fn shutdown(&mut self) {
+        drop(self.stdin.take());
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(status) = self.child.try_wait().expect("wait for server") {
+                assert!(status.success(), "server exited unsuccessfully: {status}");
+                break;
+            }
+            if Instant::now() >= deadline {
+                panic!("server did not exit within 5 seconds of stdin EOF");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
 }
 
 impl Drop for Client {
@@ -144,19 +159,31 @@ fn server_exits_promptly_when_stdin_closes() {
     client.initialize(Some("2025-06-18"));
     assert_eq!(client.request(2, "ping", json!({}))["result"], json!({}));
 
-    // Close the sole writer while retaining the child so we can observe exit.
-    drop(client.stdin.take());
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        if let Some(status) = client.child.try_wait().expect("wait for server") {
-            assert!(status.success(), "server exited unsuccessfully: {status}");
-            break;
-        }
-        if Instant::now() >= deadline {
-            panic!("server did not exit within 5 seconds of stdin EOF");
-        }
-        std::thread::sleep(Duration::from_millis(10));
+    client.shutdown();
+}
+
+#[test]
+fn multiple_requests_receive_matching_responses_before_clean_shutdown() {
+    let dir = tempdir().unwrap();
+    let mut client = Client::spawn(dir.path());
+    client.initialize(Some("2025-06-18"));
+
+    let mut remaining = std::collections::HashSet::from([2, 17, 42, 100]);
+    for id in [2, 17, 42, 100] {
+        client.send_raw(&json!({"jsonrpc": "2.0", "id": id, "method": "ping"}).to_string());
     }
+    for _ in 0..remaining.len() {
+        let response = client.read();
+        assert_eq!(response["jsonrpc"], "2.0", "{response}");
+        let id = response["id"].as_i64().expect("response has numeric id");
+        assert!(
+            remaining.remove(&id),
+            "unexpected or duplicate id: {response}"
+        );
+        assert_eq!(response["result"], json!({}), "{response}");
+    }
+    assert!(remaining.is_empty(), "missing responses: {remaining:?}");
+    client.shutdown();
 }
 
 #[test]
